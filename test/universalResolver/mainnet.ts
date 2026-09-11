@@ -1,6 +1,10 @@
 import type { Address } from 'viem'
 import type { KnownProfile, KnownReverse } from '../utils/resolutions.js'
-import { COIN_TYPE_ETH } from '../fixtures/ensip19.js'
+import {
+  COIN_TYPE_DEFAULT,
+  COIN_TYPE_ETH,
+  coinTypeFromChain,
+} from '../fixtures/ensip19.js'
 
 export const ENS_REGISTRY: Address =
   '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e'
@@ -90,7 +94,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'Coinbase',
     name: 'raffy.base.eth',
-    extended: true,
     texts: [
       { key: 'url', value: 'https://raffy.xyz' },
       { key: 'com.github', value: 'adraffy' },
@@ -99,7 +102,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'Coinbase',
     name: 'adraffy.cb.id',
-    extended: true,
     addresses: [
       {
         coinType: 0n,
@@ -118,7 +120,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'Namestone',
     name: 'slobo.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -137,7 +138,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'Namespace',
     name: 'thecap.gotbased.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -155,7 +155,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'ENSOffchainResolver',
     name: '1.offchainexample.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -174,11 +173,10 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'Clave',
     name: 'getclave.clv.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
-        value: '0x6cEDe3712346471a57DBB07A610714a109Db2550',
+        value: '0x62Ae9c1dcA30e09AFF1b23D30aCFb780dc0724b8',
         origin: 'off',
       },
     ],
@@ -186,7 +184,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'BNB',
     name: 'cz.bnb.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -198,7 +195,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'Unruggable Gateway',
     name: 'raffy.teamnick.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -217,7 +213,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'EVMGateway',
     name: 'raffy.linea.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -229,7 +224,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'LineaNFTResolver',
     name: '1.efrogs.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -241,7 +235,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'NFTResolver',
     name: 'moo331.nft-owner.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -254,7 +247,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: '3DNS',
     name: 'josh.box',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -267,7 +259,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'OffchainDNS',
     name: 'taytems.xyz', // 'brantly.rocks'
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -279,7 +270,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'OffchainDNS',
     name: 'ezccip.raffy.xyz',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -298,7 +288,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
   {
     title: 'JustaName',
     name: 'yodl.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -310,7 +299,6 @@ export const KNOWN_RESOLUTIONS: KnownProfile[] = [
     // warning: this requires chainId = 1
     title: 'Uninames',
     name: 'raffy.uni.eth',
-    extended: true,
     addresses: [
       {
         coinType: COIN_TYPE_ETH,
@@ -326,30 +314,51 @@ export const KNOWN_PRIMARIES: KnownReverse[] = [
     title: 'ReverseV1',
     address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
     coinType: COIN_TYPE_ETH,
-    expectPrimary: true,
+    primary: 'vitalik.eth',
   },
   {
     title: 'ReverseV2',
-    address: '0x51050ec063d393217b436747617ad1c2285aeeee',
+    address: '0x51050ec063d393217B436747617aD1C2285Aeeee',
     coinType: COIN_TYPE_ETH,
-    expectPrimary: true,
+    primary: 'raffy.eth',
   },
   {
     title: 'PublicResolverV3',
     address: '0xacE594e18275c46302a6E76F3518b80D92849000',
     coinType: COIN_TYPE_ETH,
-    expectPrimary: true,
+    primary: 'cold.raffy.eth',
   },
   {
-    title: 'does not exist',
-    address: '0x0000000000000000000000000000000000000001',
+    address: '0x179A862703a4adfb29896552DF9e307980D19285',
+    coinType: COIN_TYPE_DEFAULT,
+    primary: 'gregskril.eth',
+  },
+  {
+    address: '0x179A862703a4adfb29896552DF9e307980D19285',
+    coinType: coinTypeFromChain(8453),
+    primary: 'greg.base.eth',
+  },
+  {
+    title: 'no name',
+    address: '0x8000000000000000000000000000000000000001',
     coinType: COIN_TYPE_ETH,
-    expectError: true,
+    primary: '',
   },
   {
-    title: 'does not exist',
-    address: '0x0000000000000000000000000000000000000001',
+    title: 'no name',
+    address: '0x8000000000000000000000000000000000000001',
+    coinType: COIN_TYPE_DEFAULT,
+    primary: '',
+  },
+  {
+    title: 'no name',
+    address: '0x8000000000000000000000000000000000000001',
+    coinType: coinTypeFromChain(8453),
+    primary: '',
+  },
+  {
+    title: 'no resolver',
+    address: '0x00',
     coinType: 0n,
-    expectError: true,
   },
 ]

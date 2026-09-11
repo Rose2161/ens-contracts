@@ -135,6 +135,7 @@ PublicResolver includes the following profiles that implements different EIPs.
 - ABIResolver = EIP 205 - ABI support (`ABI()`).
 - AddrResolver = EIP 137 - Contract address interface. EIP 2304 - Multicoin support (`addr()`).
 - ContentHashResolver = EIP 1577 - Content hash support (`contenthash()`).
+- DataResolver =  ENSIP-24 - Arbitrary Data Resolution (`data()`).
 - InterfaceResolver = EIP 165 - Interface Detection (`supportsInterface()`).
 - NameResolver = EIP 181 - Reverse resolution (`name()`).
 - PubkeyResolver = EIP 619 - SECP256k1 public keys (`pubkey()`).
@@ -185,7 +186,7 @@ Mainnet Safe address: `0x353530FE74098903728Ddb66Ecdb70f52e568eC1`
 
 When readying a new deployment of certain contracts, bump the deploy script version number to the appropriate new version. Doing this ensures that the new deployment script will run for each network.
 
-Deployment scripts can be run for any specified network found in the [config](hardhat.config.cts#L38), with the following:
+Deployment scripts can be run for any specified network found in the [config](hardhat.config.ts#L38), with the following:
 
 ```
 bun hh --network <network_name> deploy

@@ -4,10 +4,20 @@ pragma solidity ^0.8.17;
 import {IBatchGateway} from "./IBatchGateway.sol";
 import {CCIPReader, EIP3668, OffchainLookup} from "./CCIPReader.sol";
 
+/// @dev CCIP-Read batch gateway client implementation.
+///
+/// Since requests are read-only, empty responses are considered an error.
+///
+/// Usage: `ccipRead(address(this), abi.encodeCall(this.ccipBatch, (createBatch(...))), ...)`
+///
 abstract contract CCIPBatcher is CCIPReader {
     /// @notice The batch gateway supplied an incorrect number of responses.
     /// @dev Error selector: `0x4a5c31ea`
     error InvalidBatchGatewayResponse();
+
+    /// @notice A batch gateway lookup failed with an unexpected selector.
+    /// @dev Error selector: `0x2fa87250`
+    error UnsafeBatchGatewayResponse(bytes);
 
     uint256 constant FLAG_OFFCHAIN = 1 << 0; // the lookup reverted `OffchainLookup`
     uint256 constant FLAG_CALL_ERROR = 1 << 1; // the initial call or callback reverted
@@ -60,6 +70,9 @@ abstract contract CCIPBatcher is CCIPReader {
     ) external view returns (Batch memory) {
         for (uint256 i; i < batch.lookups.length; ++i) {
             Lookup memory lu = batch.lookups[i];
+            if ((lu.flags & FLAG_DONE) != 0) {
+                continue; // don't call a lookup that's already done
+            }
             if ((lu.flags & FLAGS_ANY_EIP140) == 0) {
                 uint256 flags = detectEIP140(lu.target)
                     ? FLAG_EIP140_AFTER
@@ -148,6 +161,12 @@ abstract contract CCIPBatcher is CCIPReader {
                     bytes memory v = responses[expected];
                     if (failures[expected]) {
                         lu.flags |= FLAG_DONE | FLAG_BATCH_ERROR;
+                        if (!_isSafeBatchGatewayError(bytes4(v))) {
+                            v = abi.encodeWithSelector(
+                                UnsafeBatchGatewayResponse.selector,
+                                v
+                            ); // wrap unless safe
+                        }
                     } else {
                         EIP3668.Params memory p = decodeOffchainLookup(lu.data);
                         bool ok;
@@ -181,5 +200,47 @@ abstract contract CCIPBatcher is CCIPReader {
             revert InvalidBatchGatewayResponse();
         }
         _revertBatchGateway(batch);
+    }
+
+    /// @dev Determine if the batch gateway error is safe to propagate.
+    ///      Note: `error OffchainLookup` should *NEVER* be considered safe.
+    function _isSafeBatchGatewayError(
+        bytes4 selector
+    ) internal view virtual returns (bool) {
+        return
+            selector == IBatchGateway.HttpError.selector ||
+            selector == 0x08c379a0; // Error(string)
+    }
+
+    /// @dev Safely collapse `Lookup[]` into `bytes[]`.
+    ///      If `FLAGS_ANY_ERROR` and response is non-empty, the response is zero-padded so that `length % 32 == 4`.
+    /// @param lookups Array of completed lookups.
+    /// @param wrapped If `true`, successful responses are unwrapped as `bytes`.
+    /// @return arr Array of call responses.
+    function _toResponseArray(
+        Lookup[] memory lookups,
+        bool wrapped
+    ) internal pure returns (bytes[] memory arr) {
+        arr = new bytes[](lookups.length);
+        for (uint256 i; i < lookups.length; ++i) {
+            Lookup memory lu = lookups[i];
+            bytes memory v = lu.data;
+            if ((lu.flags & FLAGS_ANY_ERROR) == 0) {
+                if (wrapped) {
+                    v = abi.decode(v, (bytes));
+                }
+            } else if (v.length != 0) {
+                // force pad error response to length mod 32 == 4
+                // prevents unverified data from passing as valid response
+                unchecked {
+                    uint256 pad = (4 - v.length) & 31;
+                    if (pad > 0) {
+                        v = abi.encodePacked(v, new bytes(pad));
+                    }
+                }
+            }
+            arr[i] = v;
+        }
+        return arr;
     }
 }

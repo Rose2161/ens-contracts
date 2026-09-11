@@ -10,7 +10,7 @@ import {IGatewayProvider} from "../ccipRead/IGatewayProvider.sol";
 import {NameCoder} from "../utils/NameCoder.sol";
 import {BytesUtils} from "../utils/BytesUtils.sol";
 import {ENSIP19, COIN_TYPE_ETH, COIN_TYPE_DEFAULT} from "../utils/ENSIP19.sol";
-import {IFeatureSupporter} from "../utils/IFeatureSupporter.sol";
+import {IERC7996} from "../utils/IERC7996.sol";
 import {ResolverFeatures} from "../resolvers/ResolverFeatures.sol";
 
 // resolver profiles
@@ -95,14 +95,14 @@ abstract contract AbstractUniversalResolver is
         return resolveWithGateways(name, data, batchGatewayProvider.gateways());
     }
 
-    /// @notice Performs ENS resolution process for the supplied name and resolution data.
+    /// @notice Performs ENS forward resolution for the supplied name and data.
     ///         Caller should enable EIP-3668.
     /// @dev This function executes over multiple steps.
-    /// @param name The name to resolve, in normalised and DNS-encoded form.
-    /// @param data The resolution data, as specified in ENSIP-10.
+    /// @param name The DNS-encoded name to resolve.
+    /// @param data The ABI-encoded resolver calldata.
     /// @param gateways The list of batch gateway URLs to use.
-    /// @return result The encoded response for the requested call.
-    /// @return resolver The address of the resolver that supplied `result`.
+    /// @return result The ABI-encoded response for the calldata.
+    /// @return resolver The resolver that was used to resolve the name.
     function resolveWithGateways(
         bytes calldata name,
         bytes calldata data,
@@ -137,7 +137,7 @@ abstract contract AbstractUniversalResolver is
             data,
             gateways,
             this.resolveCallback.selector, // ==> step 2
-            abi.encode(resolver)
+            abi.encode(resolver) // this value is ignored
         );
     }
 
@@ -273,10 +273,10 @@ abstract contract AbstractUniversalResolver is
     }
 
     /// @dev Efficiently call a resolver.
-    ///      If features are supported, and not a multicall or extended w/`RESOLVE_MULTICALL`, performs a direct call.
+    ///      If ENSIP-22 is supported, performs a direct call.
     ///      Otherwise, uses the batch gateway.
     /// @param info The resolver to call.
-    /// @param call The calldata.
+    /// @param call The resolution calldata.
     /// @param gateways The list of batch gateway URLs to use.
     /// @param callbackFunction The function selector to call after resolution.
     /// @param extraData The contextual data passed to `callbackFunction`.
@@ -287,14 +287,15 @@ abstract contract AbstractUniversalResolver is
         bytes4 callbackFunction,
         bytes memory extraData
     ) internal view {
+        bool multi = bytes4(call) == IMulticallable.multicall.selector;
         if (
             ERC165Checker.supportsERC165InterfaceUnchecked(
                 info.resolver,
-                type(IFeatureSupporter).interfaceId
+                type(IERC7996).interfaceId
             ) &&
-            (bytes4(call) != IMulticallable.multicall.selector ||
+            (!multi ||
                 (info.extended &&
-                    IFeatureSupporter(info.resolver).supportsFeature(
+                    IERC7996(info.resolver).supportsFeature(
                         ResolverFeatures.RESOLVE_MULTICALL
                     )))
         ) {
@@ -315,37 +316,35 @@ abstract contract AbstractUniversalResolver is
                     extraData
                 )
             );
-        } else {
-            bytes[] memory calls;
-            bool multi = bytes4(call) == IMulticallable.multicall.selector;
-            if (multi) {
-                calls = abi.decode(
-                    BytesUtils.substring(call, 4, call.length - 4),
-                    (bytes[])
-                );
-            } else {
-                calls = new bytes[](1);
-                calls[0] = call;
-            }
-            if (info.extended) {
-                for (uint256 i; i < calls.length; ++i) {
-                    calls[i] = abi.encodeCall(
-                        IExtendedResolver.resolve,
-                        (info.name, calls[i])
-                    );
-                }
-            }
-            ccipRead(
-                address(this),
-                abi.encodeCall(
-                    this.ccipBatch,
-                    (createBatch(info.resolver, calls, gateways))
-                ),
-                this.resolveBatchCallback.selector,
-                IDENTITY_FUNCTION,
-                abi.encode(info.extended, multi, callbackFunction, extraData)
-            );
         }
+        bytes[] memory calls;
+        if (multi) {
+            calls = abi.decode(
+                BytesUtils.substring(call, 4, call.length - 4),
+                (bytes[])
+            );
+        } else {
+            calls = new bytes[](1);
+            calls[0] = call;
+        }
+        if (info.extended) {
+            for (uint256 i; i < calls.length; ++i) {
+                calls[i] = abi.encodeCall(
+                    IExtendedResolver.resolve,
+                    (info.name, calls[i])
+                );
+            }
+        }
+        ccipRead(
+            address(this),
+            abi.encodeCall(
+                this.ccipBatch,
+                (createBatch(info.resolver, calls, gateways))
+            ),
+            this.resolveBatchCallback.selector,
+            IDENTITY_FUNCTION,
+            abi.encode(info.extended, multi, callbackFunction, extraData)
+        );
     }
 
     /// @dev CCIP-Read callback for `_callResolver()` from calling the resolver successfully.
@@ -393,16 +392,7 @@ abstract contract AbstractUniversalResolver is
         ) = abi.decode(extraData, (bool, bool, bytes4, bytes));
         bytes memory answer;
         if (multi) {
-            bytes[] memory m = new bytes[](lookups.length);
-            for (uint256 i; i < lookups.length; ++i) {
-                Lookup memory lu = lookups[i];
-                bytes memory v = lu.data;
-                if (extended && (lu.flags & FLAGS_ANY_ERROR) == 0) {
-                    v = abi.decode(v, (bytes)); // unwrap resolve()
-                }
-                m[i] = v;
-            }
-            answer = abi.encode(m);
+            answer = abi.encode(_toResponseArray(lookups, extended));
         } else {
             Lookup memory lu = lookups[0];
             answer = lu.data;
